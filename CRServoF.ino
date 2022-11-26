@@ -12,6 +12,9 @@
  */
 #define NUM_OUTPUTS 8
 
+bool staton = false;
+bool viewoutputs = true;
+
 // Configuration
 // Map input CRSF channels (1-based, up to 16 for CRSF, 12 for ELRS) to outputs 1-8
 // use a negative number to invert the signal (i.e. +100% becomes -100%)
@@ -88,8 +91,9 @@ static void packetChannels()
         }
         servoSetUs(out, usOutput);
     }
-
-     for (unsigned int ch=1; ch<=8; ++ch)
+    if (viewoutputs == true)
+    {
+     for (unsigned int ch=1; ch<=NUM_OUTPUTS; ++ch)
      {
          Serial.write("CH");
          Serial.write(ch < 10 ? '0' + ch : 'A' + ch - 10);
@@ -98,12 +102,22 @@ static void packetChannels()
          Serial.write("\t");
      }
      Serial.println();
+    }
 }
 
 static void packetLinkStatistics(crsfLinkStatistics_t *link)
 {
-  //Serial.print(link->uplink_RSSI_1, DEC);
-  //Serial.println("dBm");
+  if (staton == true)
+  {
+    Serial.print("\r\nRSSIUP=");Serial.print(link->uplink_RSSI_1, DEC);Serial.println("dBm");
+    Serial.print("RSSIDW=");Serial.print(link->downlink_RSSI, DEC);Serial.println("dBm");
+    Serial.print("LQIUP=");Serial.print(link->uplink_Link_quality, DEC);Serial.println("%");
+    Serial.print("LQIDW=");Serial.print(link->downlink_Link_quality, DEC);Serial.println("%");
+    Serial.print("ACTIVE=");Serial.println(link->active_antenna, DEC);
+    Serial.print("RFMD=");Serial.println(link->rf_Mode, DEC);
+    Serial.print("TXPOWER=");Serial.print(link->uplink_TX_Power, DEC);Serial.println("mW\r\n");
+    staton = false;
+  }
 }
 
 static void crsfLinkUp()
@@ -155,13 +169,52 @@ static bool handleSerialCommand(char *cmd)
     bool prompt = true;
     if (strcmp(cmd, "#") == 0)
     {
-        Serial.println("Fake CLI Mode, type 'exit' or 'help' to do nothing\r\n");
+        Serial.println("\r\nFake CLI Mode, type 'exit' or 'help' to do nothing\r\n");
         g_State.serialEcho = true;
     }
 
+    else if ((strcmp(cmd, "help") == 0) || (strcmp(cmd, "h") == 0) || (strcmp(cmd, "H") == 0))
+    {
+        if(viewoutputs == true)
+          viewoutputs = false;
+        Serial.print("help,h,H Help\r\n");
+        Serial.print("exit Quit\r\n");
+        Serial.print("viewchon View channels is ON\r\n");
+        Serial.print("viewchoff View channels is OFF\r\n");
+        Serial.print("staton Statistics is ON\r\n");
+        Serial.print("statoff Statistics is OFF\r\n");
+        Serial.print("serial Serial config\r\n\r\n");
+//        Serial.print("get serialrx_provider Return CRSF\r\n");
+//        Serial.print("staton Statistics is ON\r\n");
+    }
+    else if (strcmp(cmd, "viewchon") == 0)
+    {
+        staton = false;
+        viewoutputs = true;
+        Serial.println("View channels is ON\r\n");
+    }
+
+    else if (strcmp(cmd, "viewchoff") == 0)
+    {
+        staton = false;
+        viewoutputs = false;
+        Serial.println("View channels is OFF\r\n");
+    }
+    else if (strcmp(cmd, "staton") == 0)
+    {
+        viewoutputs = false;
+        staton = true;
+        Serial.println("Statistics is ON\r\n");
+    }
+    else if (strcmp(cmd, "statoff") == 0)
+    {
+        staton = false;
+        viewoutputs = true;
+        Serial.println("Statistics is OFF\r\n");
+    }   
     else if (strcmp(cmd, "serial") == 0)
         Serial.println("serial 5 64 0 0 0 0\r\n");
-
+/*
     else if (strcmp(cmd, "get serialrx_provider") == 0)
         Serial.println("serialrx_provider = CRSF\r\n");
 
@@ -170,7 +223,7 @@ static bool handleSerialCommand(char *cmd)
 
     else if (strcmp(cmd, "get serialrx_halfduplex") == 0)
         Serial.println("serialrx_halfduplex = OFF\r\n");
-
+*/
     else if (strncmp(cmd, "serialpassthrough 5 ", 20) == 0)
     {
         Serial.println("Passthrough serial 5");
